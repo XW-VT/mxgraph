@@ -204,15 +204,23 @@ var ColorDialog = function(editorUi, color, apply, cancelFn)
 	var applyBtn = mxUtils.button(mxResources.get('apply'), function()
 	{
 		var color = input.value;
-		ColorDialog.addRecentColor(color, 12);
 		
-		if (color != 'none' && color.charAt(0) != '#')
+		// Blocks any non-alphabetic chars in colors
+		if (/(^#?[a-zA-Z0-9]*$)/.test(color))
 		{
-			color = '#' + color;
-		}
+			if (color != 'none' && color.charAt(0) != '#')
+			{
+				color = '#' + color;
+			}
 
-		applyFunction(color);
-		editorUi.hideDialog();
+			ColorDialog.addRecentColor((color != 'none') ? color.substring(1) : color, 12);
+			applyFunction(color);
+			editorUi.hideDialog();
+		}
+		else
+		{
+			editorUi.handleError({message: mxResources.get('invalidInput')});	
+		}
 	});
 	applyBtn.className = 'geBtn gePrimaryBtn';
 	buttons.appendChild(applyBtn);
@@ -365,7 +373,7 @@ var AboutDialog = function(editorUi)
 /**
  * Constructs a new filename dialog.
  */
-var FilenameDialog = function(editorUi, filename, buttonText, fn, label, validateFn, content, helpLink, closeOnBtn, cancelFn, hints)
+var FilenameDialog = function(editorUi, filename, buttonText, fn, label, validateFn, content, helpLink, closeOnBtn, cancelFn, hints, w)
 {
 	closeOnBtn = (closeOnBtn != null) ? closeOnBtn : true;
 	var row, td;
@@ -387,7 +395,7 @@ var FilenameDialog = function(editorUi, filename, buttonText, fn, label, validat
 	var nameInput = document.createElement('input');
 	nameInput.setAttribute('value', filename || '');
 	nameInput.style.marginLeft = '4px';
-	nameInput.style.width = '180px';
+	nameInput.style.width = (w != null) ? w + 'px' : '180px';
 	
 	var genericBtn = mxUtils.button(buttonText, function()
 	{
@@ -479,6 +487,7 @@ var FilenameDialog = function(editorUi, filename, buttonText, fn, label, validat
 	};
 
 	td = document.createElement('td');
+	td.style.whiteSpace = 'nowrap';
 	td.appendChild(nameInput);
 	row.appendChild(td);
 	
@@ -619,7 +628,8 @@ FilenameDialog.createTypeHint = function(ui, nameInput, hints)
 /**
  * Constructs a new textarea dialog.
  */
-var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w, h, addButtons, noHide, noWrap, applyTitle)
+var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w, h,
+	addButtons, noHide, noWrap, applyTitle, helpLink)
 {
 	w = (w != null) ? w : 300;
 	h = (h != null) ? h : 120;
@@ -677,6 +687,17 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 	td.style.paddingTop = '14px';
 	td.style.whiteSpace = 'nowrap';
 	td.setAttribute('align', 'right');
+	
+	if (helpLink != null)
+	{
+		var helpBtn = mxUtils.button(mxResources.get('help'), function()
+		{
+			editorUi.editor.graph.openLink(helpLink);
+		});
+		helpBtn.className = 'geBtn';
+		
+		td.appendChild(helpBtn);
+	}
 	
 	var cancelBtn = mxUtils.button(cancelTitle || mxResources.get('cancel'), function()
 	{
@@ -1058,6 +1079,97 @@ var ExportDialog = function(editorUi)
 	
 	td = document.createElement('td');
 	td.style.fontSize = '10pt';
+	mxUtils.write(td, mxResources.get('dpi') + ':');
+	
+	row.appendChild(td);
+	
+	var dpiSelect = document.createElement('select');
+	dpiSelect.style.width = '180px';
+
+	var dpi100Option = document.createElement('option');
+	dpi100Option.setAttribute('value', '100');
+	mxUtils.write(dpi100Option, '100dpi');
+	dpiSelect.appendChild(dpi100Option);
+
+	var dpi200Option = document.createElement('option');
+	dpi200Option.setAttribute('value', '200');
+	mxUtils.write(dpi200Option, '200dpi');
+	dpiSelect.appendChild(dpi200Option);
+	
+	var dpi300Option = document.createElement('option');
+	dpi300Option.setAttribute('value', '300');
+	mxUtils.write(dpi300Option, '300dpi');
+	dpiSelect.appendChild(dpi300Option);
+	
+	var dpi400Option = document.createElement('option');
+	dpi400Option.setAttribute('value', '400');
+	mxUtils.write(dpi400Option, '400dpi');
+	dpiSelect.appendChild(dpi400Option);
+	
+	var dpiCustOption = document.createElement('option');
+	dpiCustOption.setAttribute('value', 'custom');
+	mxUtils.write(dpiCustOption, mxResources.get('custom'));
+	dpiSelect.appendChild(dpiCustOption);
+
+	var customDpi = document.createElement('input');
+	customDpi.style.width = '180px';
+	customDpi.style.display = 'none';
+	customDpi.setAttribute('value', '100');
+	customDpi.setAttribute('type', 'number');
+	customDpi.setAttribute('min', '50');
+	customDpi.setAttribute('step', '50');
+	
+	var zoomUserChanged = false;
+	
+	mxEvent.addListener(dpiSelect, 'change', function()
+	{
+		if (this.value == 'custom')
+		{
+			this.style.display = 'none';
+			customDpi.style.display = '';
+			customDpi.focus();
+		}
+		else
+		{
+			customDpi.value = this.value;
+			
+			if (!zoomUserChanged) 
+			{
+				zoomInput.value = this.value;
+			}
+		}
+	});
+	
+	mxEvent.addListener(customDpi, 'change', function()
+	{
+		var dpi = parseInt(customDpi.value);
+		
+		if (isNaN(dpi) || dpi <= 0)
+		{
+			customDpi.style.backgroundColor = 'red';
+		}
+		else
+		{
+			customDpi.style.backgroundColor = '';
+
+			if (!zoomUserChanged) 
+			{
+				zoomInput.value = dpi;
+			}
+		}	
+	});
+	
+	td = document.createElement('td');
+	td.appendChild(dpiSelect);
+	td.appendChild(customDpi);
+	row.appendChild(td);
+
+	tbody.appendChild(row);
+	
+	row = document.createElement('tr');
+	
+	td = document.createElement('td');
+	td.style.fontSize = '10pt';
 	mxUtils.write(td, mxResources.get('background') + ':');
 	
 	row.appendChild(td);
@@ -1132,6 +1244,17 @@ var ExportDialog = function(editorUi)
 		{
 			transparentCheckbox.setAttribute('disabled', 'disabled');
 		}
+		
+		if (imageFormatSelect.value === 'png')
+		{
+			dpiSelect.removeAttribute('disabled');
+			customDpi.removeAttribute('disabled');
+		}
+		else
+		{
+			dpiSelect.setAttribute('disabled', 'disabled');
+			customDpi.setAttribute('disabled', 'disabled');
+		}
 	};
 	
 	mxEvent.addListener(imageFormatSelect, 'change', formatChanged);
@@ -1160,6 +1283,7 @@ var ExportDialog = function(editorUi)
 
 	mxEvent.addListener(zoomInput, 'change', function()
 	{
+		zoomUserChanged = true;
 		var s = Math.max(0, parseFloat(zoomInput.value) || 100) / 100;
 		zoomInput.value = parseFloat((s * 100).toFixed(2));
 		
@@ -1235,6 +1359,7 @@ var ExportDialog = function(editorUi)
 	    	var s = Math.max(0, parseFloat(zoomInput.value) || 100) / 100;
 			var b = Math.max(0, parseInt(borderInput.value));
 			var bg = graph.background;
+			var dpi = Math.max(1, parseInt(customDpi.value));
 			
 			if ((format == 'svg' || format == 'png') && transparentCheckbox.checked)
 			{
@@ -1246,7 +1371,7 @@ var ExportDialog = function(editorUi)
 			}
 			
 			ExportDialog.lastBorderValue = b;
-			ExportDialog.exportFile(editorUi, name, format, bg, s, b);
+			ExportDialog.exportFile(editorUi, name, format, bg, s, b, dpi);
 		}
 	}));
 	saveBtn.className = 'geBtn gePrimaryBtn';
@@ -1295,7 +1420,7 @@ ExportDialog.showXmlOption = true;
  * parameter and value to be used in the request in the form
  * key=value, where value should be URL encoded.
  */
-ExportDialog.exportFile = function(editorUi, name, format, bg, s, b)
+ExportDialog.exportFile = function(editorUi, name, format, bg, s, b, dpi)
 {
 	var graph = editorUi.editor.graph;
 	
@@ -1337,7 +1462,8 @@ ExportDialog.exportFile = function(editorUi, name, format, bg, s, b)
 			var req = new mxXmlRequest(EXPORT_URL, 'format=' + format +
 				'&filename=' + encodeURIComponent(name) +
 				'&bg=' + ((bg != null) ? bg : 'none') +
-				'&w=' + w + '&h=' + h + '&' + param);
+				'&w=' + w + '&h=' + h + '&' + param +
+				'&dpi=' + dpi);
 			req.simulate(document, '_blank');
 		}
 		else
@@ -1400,7 +1526,6 @@ var EditDataDialog = function(ui, cell)
 	var id = (EditDataDialog.getDisplayIdForCell != null) ?
 		EditDataDialog.getDisplayIdForCell(ui, cell) : null;
 	
-	// FIXME: Fix remove button for quirks mode
 	var addRemoveButton = function(text, name)
 	{
 		var wrapper = document.createElement('div');
@@ -1497,12 +1622,11 @@ var EditDataDialog = function(ui, cell)
 
 	if (id != null)
 	{	
-		var text = document.createElement('input');
-		text.style.width = '420px';
+		var text = document.createElement('div');
+		text.style.width = '100%';
+		text.style.fontSize = '11px';
 		text.style.textAlign = 'center';
-		text.setAttribute('type', 'text');
-		text.setAttribute('readOnly', 'true');
-		text.setAttribute('value', id);
+		mxUtils.write(text, id);
 		
 		form.addField(mxResources.get('id') + ':', text);
 	}
@@ -1518,15 +1642,20 @@ var EditDataDialog = function(ui, cell)
 	top.appendChild(form.table);
 
 	var newProp = document.createElement('div');
+	newProp.style.boxSizing = 'border-box';
+	newProp.style.paddingRight = '160px';
 	newProp.style.whiteSpace = 'nowrap';
 	newProp.style.marginTop = '6px';
-
+	newProp.style.width = '100%';
+	
 	var nameInput = document.createElement('input');
 	nameInput.setAttribute('placeholder', mxResources.get('enterPropertyName'));
 	nameInput.setAttribute('type', 'text');
 	nameInput.setAttribute('size', (mxClient.IS_IE || mxClient.IS_IE11) ? '36' : '40');
+	nameInput.style.boxSizing = 'border-box';
 	nameInput.style.marginLeft = '2px';
-
+	nameInput.style.width = '100%';
+	
 	newProp.appendChild(nameInput);
 	top.appendChild(newProp);
 	div.appendChild(top);
@@ -1567,6 +1696,7 @@ var EditDataDialog = function(ui, cell)
 					text.focus();
 				}
 
+				addBtn.setAttribute('disabled', 'disabled');
 				nameInput.value = '';
 			}
 			catch (e)
@@ -1592,9 +1722,14 @@ var EditDataDialog = function(ui, cell)
 		}
 	};
 	
+	addBtn.setAttribute('title', mxResources.get('addProperty'));
 	addBtn.setAttribute('disabled', 'disabled');
-	addBtn.style.marginLeft = '10px';
+	addBtn.style.textOverflow = 'ellipsis';
+	addBtn.style.position = 'absolute';
+	addBtn.style.overflow = 'hidden';
 	addBtn.style.width = '144px';
+	addBtn.style.right = '0px';
+	addBtn.className = 'geBtn';
 	newProp.appendChild(addBtn);
 
 	var cancelBtn = mxUtils.button(mxResources.get('cancel'), function()
@@ -1929,6 +2064,7 @@ var OutlineWindow = function(editorUi, x, y, w, h)
 	
 	this.window.addListener(mxEvent.SHOW, mxUtils.bind(this, function()
 	{
+		this.window.fit();
 		outline.suspended = false;
 		outline.outline.refresh();
 		outline.update();
@@ -2027,8 +2163,6 @@ var OutlineWindow = function(editorUi, x, y, w, h)
 				{
 					zoomOutAction.funct();
 				}
-	
-				mxEvent.consume(evt);
 			}
 		});
 	}
@@ -2609,6 +2743,11 @@ var LayersWindow = function(editorUi, x, y, w, h)
 	this.window.setResizable(true);
 	this.window.setClosable(true);
 	this.window.setVisible(true);
+
+	this.window.addListener(mxEvent.SHOW, mxUtils.bind(this, function()
+	{
+		this.window.fit();
+	}));
 	
 	// Make refresh available via instance
 	this.refreshLayers = refresh;

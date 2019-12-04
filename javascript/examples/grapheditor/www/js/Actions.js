@@ -65,7 +65,7 @@ Actions.prototype.init = function()
 	}).isEnabled = isGraphEnabled;
 	this.addAction('save', function() { ui.saveFile(false); }, null, null, Editor.ctrlKey + '+S').isEnabled = isGraphEnabled;
 	this.addAction('saveAs...', function() { ui.saveFile(true); }, null, null, Editor.ctrlKey + '+Shift+S').isEnabled = isGraphEnabled;
-	this.addAction('export...', function() { ui.showDialog(new ExportDialog(ui).container, 300, 230, true, true); });
+	this.addAction('export...', function() { ui.showDialog(new ExportDialog(ui).container, 300, 296, true, true); });
 	this.addAction('editDiagram...', function()
 	{
 		var dlg = new EditDiagramDialog(ui);
@@ -197,7 +197,7 @@ Actions.prototype.init = function()
 		
 		if (cells != null && cells.length > 0)
 		{
-			var parents = graph.model.getParents(cells);
+			var parents = (graph.selectParentAfterDelete) ? graph.model.getParents(cells) : null;
 			graph.removeCells(cells, includeEdges);
 			
 			// Selects parents for easier editing of groups
@@ -619,7 +619,29 @@ Actions.prototype.init = function()
 	}, null, null, Editor.ctrlKey + '+H');
 	this.addAction('zoomIn', function(evt) { graph.zoomIn(); }, null, null, Editor.ctrlKey + ' + (Numpad) / Alt+Mousewheel');
 	this.addAction('zoomOut', function(evt) { graph.zoomOut(); }, null, null, Editor.ctrlKey + ' - (Numpad) / Alt+Mousewheel');
-	this.addAction('fitWindow', function() { graph.fit(); }, null, null, Editor.ctrlKey + '+Shift+H');
+	this.addAction('fitWindow', function()
+	{
+		var bounds = (graph.isSelectionEmpty()) ? graph.getGraphBounds() : graph.getBoundingBox(graph.getSelectionCells());
+		var t = graph.view.translate;
+		var s = graph.view.scale;
+		bounds.width /= s;
+		bounds.height /= s;
+		bounds.x = bounds.x / s - t.x;
+		bounds.y = bounds.y / s - t.y;
+		
+		var cw = graph.container.clientWidth - 10;
+		var ch = graph.container.clientHeight - 10;
+		var scale = Math.floor(20 * Math.min(cw / bounds.width, ch / bounds.height)) / 20;
+		graph.zoomTo(scale);
+
+		if (mxUtils.hasScrollbars(graph.container))
+		{
+			graph.container.scrollTop = (bounds.y + t.y) * scale -
+				Math.max((ch - bounds.height * scale) / 2 + 5, 0);
+			graph.container.scrollLeft = (bounds.x + t.x) * scale -
+				Math.max((cw - bounds.width * scale) / 2 + 5, 0);
+		}
+	}, null, null, Editor.ctrlKey + '+Shift+H');
 	this.addAction('fitPage', mxUtils.bind(this, function()
 	{
 		if (!graph.pageVisible)

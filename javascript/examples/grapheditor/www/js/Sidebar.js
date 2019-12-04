@@ -12,9 +12,11 @@ function Sidebar(editorUi, container)
 	this.taglist = new Object();
 	this.showTooltips = true;
 	this.graph = editorUi.createTemporaryGraph(this.editorUi.editor.graph.getStylesheet());
-	this.graph.cellRenderer.antiAlias = false;
-	this.graph.foldingEnabled = false;
+    this.graph.cellRenderer.minSvgStrokeWidth = this.minThumbStrokeWidth;
+	this.graph.cellRenderer.antiAlias = this.thumbAntiAlias;
 	this.graph.container.style.visibility = 'hidden';
+	this.graph.foldingEnabled = false;
+
 	document.body.appendChild(this.graph.container);
 	
 	this.pointerUpHandler = mxUtils.bind(this, function()
@@ -156,6 +158,16 @@ Sidebar.prototype.thumbWidth = 42;
 Sidebar.prototype.thumbHeight = 42;
 
 /**
+ * Specifies the width of the thumbnails.
+ */
+Sidebar.prototype.minThumbStrokeWidth = 1;
+
+/**
+ * Specifies the width of the thumbnails.
+ */
+Sidebar.prototype.thumbAntiAlias = false;
+
+/**
  * Specifies the padding for the thumbnails. Default is 3.
  */
 Sidebar.prototype.thumbPadding = (document.documentMode >= 5) ? 2 : 3;
@@ -164,6 +176,19 @@ Sidebar.prototype.thumbPadding = (document.documentMode >= 5) ? 2 : 3;
  * Specifies the delay for the tooltip. Default is 2 px.
  */
 Sidebar.prototype.thumbBorder = 2;
+
+/*
+ * Experimental smaller sidebar entries
+ */
+if (urlParams['sidebar-entries'] != 'large')
+{
+	Sidebar.prototype.thumbPadding = (document.documentMode >= 5) ? 0 : 1;
+	Sidebar.prototype.thumbBorder = 1;
+	Sidebar.prototype.thumbWidth = 32;
+	Sidebar.prototype.thumbHeight = 30;
+	Sidebar.prototype.minThumbStrokeWidth = 1.3;
+	Sidebar.prototype.thumbAntiAlias = true;
+}
 
 /**
  * Specifies the size of the sidebar titles.
@@ -289,6 +314,7 @@ Sidebar.prototype.showTooltip = function(elt, cells, w, h, title, showLabel)
 				}
 
 				this.tooltip.style.width = width + 'px';
+				var w2 = width;
 				
 				// Adds title for entry
 				if (this.tooltipTitles && title != null && title.length > 0)
@@ -299,8 +325,6 @@ Sidebar.prototype.showTooltip = function(elt, cells, w, h, title, showLabel)
 						this.tooltipTitle.style.borderTop = '1px solid gray';
 						this.tooltipTitle.style.textAlign = 'center';
 						this.tooltipTitle.style.width = '100%';
-						
-						// Oversize titles are cut-off currently. Should make tooltip wider later.
 						this.tooltipTitle.style.overflow = 'hidden';
 						this.tooltipTitle.style.position = 'absolute';
 						this.tooltipTitle.style.paddingTop = '6px';
@@ -316,6 +340,8 @@ Sidebar.prototype.showTooltip = function(elt, cells, w, h, title, showLabel)
 					this.tooltipTitle.style.display = '';
 					mxUtils.write(this.tooltipTitle, title);
 					
+					// Allows for wider labels
+					w2 = Math.min(this.maxTooltipWidth, Math.max(width, this.tooltipTitle.scrollWidth + 4));
 					var ddy = this.tooltipTitle.offsetHeight + 10;
 					height += ddy;
 					
@@ -333,9 +359,15 @@ Sidebar.prototype.showTooltip = function(elt, cells, w, h, title, showLabel)
 				{
 					this.tooltipTitle.style.display = 'none';
 				}
+
+				// Updates width if label is wider
+				if (w2 > width)
+				{
+					this.tooltip.style.width = w2 + 'px';
+				}
 				
 				this.tooltip.style.height = height + 'px';
-				var x0 = -Math.round(bounds.x - this.tooltipBorder);
+				var x0 = -Math.round(bounds.x - this.tooltipBorder) + (w2 - width) / 2;
 				var y0 = -Math.round(bounds.y - this.tooltipBorder);
 				
 				var b = document.body;
@@ -411,6 +443,47 @@ Sidebar.prototype.addDataEntry = function(tags, width, height, title, data)
 	{
 	   	return this.createVertexTemplateFromData(data, width, height, title);
 	}));
+};
+
+/**
+ * Adds the give entries to the search index.
+ */
+Sidebar.prototype.addEntries = function(images)
+{
+	for (var i = 0; i < images.length; i++)
+	{
+		(mxUtils.bind(this, function(img)
+		{
+			var data = img.data;
+			
+			if (data != null && img.title != null)
+			{
+				this.addEntry(img.title, mxUtils.bind(this, function()
+				{
+					data = this.editorUi.convertDataUri(data);
+					var s = 'shape=image;verticalLabelPosition=bottom;verticalAlign=top;imageAspect=0;';
+					
+					if (img.aspect == 'fixed')
+					{
+						s += 'aspect=fixed;'
+					}
+					
+					return this.createVertexTemplate(s + 'image=' +
+						data, img.w, img.h, '', img.title || '', false, false, true)
+				}));
+			}
+			else if (img.xml != null && img.title != null)
+			{
+				this.addEntry(img.title, mxUtils.bind(this, function()
+				{
+					var cells = this.editorUi.stringToCells(Graph.decompress(img.xml));
+
+					return this.createVertexTemplateFromCells(
+						cells, img.w, img.h, img.title || '', true, false, true);
+				}));
+			}
+		}))(images[i]);
+	}
 };
 
 /**
@@ -607,6 +680,7 @@ Sidebar.prototype.addSearchPalette = function(expand)
 	input.style.width = '100%';
 	input.style.outline = 'none';
 	input.style.padding = '6px';
+	input.style.paddingRight = '20px';
 	inner.appendChild(input);
 
 	var cross = document.createElement('img');
@@ -645,7 +719,7 @@ Sidebar.prototype.addSearchPalette = function(expand)
 	button.style.marginTop = '4px';
 	button.style.marginBottom = '8px';
 	center.style.paddingTop = '4px';
-	center.style.paddingBottom = '8px';
+	center.style.paddingBottom = '4px';
 	
 	center.appendChild(button);
 	div.appendChild(center);
@@ -732,6 +806,12 @@ Sidebar.prototype.addSearchPalette = function(expand)
 							active = false;
 							page++;
 							this.insertSearchHint(div, searchTerm, count, page, results, len, more, terms);
+							
+							// Allows to repeat the search
+							if (results.length == 0 && page == 1)
+							{
+								searchTerm = '';
+							}
 
 							if (center.parentNode != null)
 							{
@@ -740,13 +820,20 @@ Sidebar.prototype.addSearchPalette = function(expand)
 							
 							for (var i = 0; i < results.length; i++)
 							{
-								var elt = results[i]();
-								
-								// Avoids duplicates in results
-								if (hash[elt.innerHTML] == null)
+								try
 								{
-									hash[elt.innerHTML] = '1';
-									div.appendChild(results[i]());
+									var elt = results[i]();
+									
+									// Avoids duplicates in results
+									if (hash[elt.innerHTML] == null)
+									{
+										hash[elt.innerHTML] = '1';
+										div.appendChild(elt);
+									}
+								}
+								catch (e)
+								{
+									// ignore
 								}
 							}
 							
@@ -793,18 +880,6 @@ Sidebar.prototype.addSearchPalette = function(expand)
 			mxEvent.consume(evt);
 		}
 	}));
-	
-	mxEvent.addListener(input, 'focus', function()
-	{
-		input.style.paddingRight = '';
-	});
-	
-	mxEvent.addListener(input, 'blur', function()
-	{
-		input.style.paddingRight = '20px';
-	});
-
-	input.style.paddingRight = '20px';
 	
 	mxEvent.addListener(input, 'keyup', mxUtils.bind(this, function(evt)
 	{
@@ -926,6 +1001,9 @@ Sidebar.prototype.addGeneralPalette = function(expand)
 	    this.createVertexTemplateEntry('shape=card;whiteSpace=wrap;html=1;', 80, 100, '', 'Card'),
 	    this.createVertexTemplateEntry('shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;', 120, 80, '', 'Callout', null, null, 'bubble chat thought speech message'),
 	 	this.createVertexTemplateEntry('shape=umlActor;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;html=1;outlineConnect=0;', 30, 60, 'Actor', 'Actor', false, null, 'user person human stickman'),
+	 	this.createVertexTemplateEntry('shape=xor;whiteSpace=wrap;html=1;', 60, 80, '', 'Or', null, null, 'logic or'),
+	 	this.createVertexTemplateEntry('shape=or;whiteSpace=wrap;html=1;', 60, 80, '', 'And', null, null, 'logic and'),
+	 	this.createVertexTemplateEntry('shape=dataStorage;whiteSpace=wrap;html=1;', 100, 80, '', 'Data Storage'),    
 	 	this.addEntry('curve', mxUtils.bind(this, function()
 	 	{
 			var cell = new mxCell('', new mxGeometry(0, 0, 50, 50), 'curved=1;endArrow=classic;html=1;');
@@ -1091,9 +1169,6 @@ Sidebar.prototype.createAdvancedShapes = function()
 	field.vertex = true;
 
 	return [
-	 	this.createVertexTemplateEntry('shape=xor;whiteSpace=wrap;html=1;', 60, 80, '', 'Or', null, null, 'logic or'),
-	 	this.createVertexTemplateEntry('shape=or;whiteSpace=wrap;html=1;', 60, 80, '', 'And', null, null, 'logic and'),
-	 	this.createVertexTemplateEntry('shape=dataStorage;whiteSpace=wrap;html=1;', 100, 80, '', 'Data Storage'),    
 	 	this.createVertexTemplateEntry('shape=tapeData;whiteSpace=wrap;html=1;perimeter=ellipsePerimeter;', 80, 80, '', 'Tape Data'),
 	 	this.createVertexTemplateEntry('shape=manualInput;whiteSpace=wrap;html=1;', 80, 80, '', 'Manual Input'),
 	 	this.createVertexTemplateEntry('shape=loopLimit;whiteSpace=wrap;html=1;', 100, 80, '', 'Loop Limit'),
@@ -1297,8 +1372,13 @@ Sidebar.prototype.addUmlPalette = function(expand)
 			
 			return sb.createVertexTemplateFromCells([cell.clone()], cell.geometry.width, cell.geometry.height, 'Interface 2');
 		}),
-		this.createVertexTemplateEntry('shape=providedRequiredInterface;html=1;verticalLabelPosition=bottom;', 20, 20, '', 'Provided/Required Interface', null, null, dt + 'provided required interface'),
-		this.createVertexTemplateEntry('shape=requiredInterface;html=1;verticalLabelPosition=bottom;', 10, 20, '', 'Required Interface', null, null, dt + 'required interface'),
+		this.createVertexTemplateEntry('shape=providedRequiredInterface;html=1;verticalLabelPosition=bottom;', 20, 20, '', 'Provided/Required Interface', null, null, 'uml provided required interface lollipop notation'),
+		this.createVertexTemplateEntry('shape=requiredInterface;html=1;verticalLabelPosition=bottom;', 10, 20, '', 'Required Interface', null, null, 'uml required interface lollipop notation'),
+		this.addEntry('uml lollipop notation provided required interface', function()
+		{
+			return sb.createVertexTemplateFromData('zVTBrptADPyavVYEkt4b0uQd3pMq5dD2uAUD27dgZJwE8vX1spsQlETtpVWRIjFjex3PmFVJWvc70m31hjlYlXxWSUqI7N/qPgVrVRyZXCUbFceR/FS8fRJdjNGo1QQN/0lB7AuO2h7AM57oeLCBIDw0Obj8SCVrJK6wxEbbV8RWyIWQP4F52Juzq9AHRqEqrm2IQpN/IsKTwAYb8MzWWBuO9B0hL2E2BGsqIQyxvJ9rzApD7QBrYBokhcBqNsf5UbrzsLzmXUu/oJET42jwGat5QYcHyiDkTDLKy03TiRrFfSx08m+FrrQtUkOZvZdbFKThmwMfVhf4fQ43/W3uZriiPPT+KKhjwnf4anKuQv//wsg+NPJ7/9d9Xf7eVykwbeeMOFWGYd/qzEVO8tHP/Suw4a2ujXV/+gXsEdhkOgSC8os44BQt0tggicZHeG1N2QiXibhAV48epRayEDd8MT7Ct06TUaXVWq027tCuhcx5VZjebeeaoDNn/WMcb/p+j0AM/dNr6InLl4Lgzylsk6OCgRWYsuI592gNZh5OhgmcblPv7+1l+ws=',
+				40, 10, 'Lollipop Notation');
+		}),
 		this.createVertexTemplateEntry('shape=umlBoundary;whiteSpace=wrap;html=1;', 100, 80, 'Boundary Object', 'Boundary Object', null, null, 'uml boundary object'),
 		this.createVertexTemplateEntry('ellipse;shape=umlEntity;whiteSpace=wrap;html=1;', 80, 80, 'Entity Object', 'Entity Object', null, null, 'uml entity object'),
 		this.createVertexTemplateEntry('ellipse;shape=umlControl;whiteSpace=wrap;html=1;', 70, 80, 'Control Object', 'Control Object', null, null, 'uml control object'),
@@ -1726,7 +1806,7 @@ Sidebar.prototype.addBpmnPalette = function(dir, expand)
 	 	this.createVertexTemplateEntry('shape=mxgraph.bpmn.business_rule_task;html=1;outlineConnect=0;', 14, 14, '', 'Business Rule Task', null, null, this.getTagsForStencil('mxgraph.bpmn', 'business_rule_task').join(' ')),
 	 	this.createVertexTemplateEntry('shape=mxgraph.bpmn.service_task;html=1;outlineConnect=0;', 14, 14, '', 'Service Task', null, null, this.getTagsForStencil('mxgraph.bpmn', 'service_task').join(' ')),
 	 	this.createVertexTemplateEntry('shape=mxgraph.bpmn.script_task;html=1;outlineConnect=0;', 14, 14, '', 'Script Task', null, null, this.getTagsForStencil('mxgraph.bpmn', 'script_task').join(' ')),
-		this.createVertexTemplateEntry('html=1;shape=mxgraph.flowchart.annotation_2;align=left;', 50, 100, '', 'Annotation', null, null, this.getTagsForStencil('bpmn', 'annotation_1', 'bpmn business process model ').join(' ')),
+		this.createVertexTemplateEntry('html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;', 50, 100, '', 'Annotation', null, null, this.getTagsForStencil('bpmn', 'annotation_1', 'bpmn business process model ').join(' ')),
 		this.createVertexTemplateEntry('rounded=1;arcSize=10;dashed=1;strokeColor=#000000;fillColor=none;gradientColor=none;dashPattern=8 3 1 3;strokeWidth=2;',
 				 200, 200, '', 'Group', null, null, this.getTagsForStencil('bpmn', 'group', 'bpmn business process model ').join(' ')),
 	 	this.createEdgeTemplateEntry('endArrow=block;endFill=1;endSize=6;html=1;', 100, 0, '', 'Sequence Flow', null, 'bpmn sequence flow'),
@@ -1786,7 +1866,8 @@ Sidebar.prototype.createThumb = function(cells, width, height, parent, title, sh
 	var node = null;
 	
 	// For supporting HTML labels in IE9 standards mode the container is cloned instead
-	if (this.graph.dialect == mxConstants.DIALECT_SVG && !mxClient.NO_FO)
+	if (this.graph.dialect == mxConstants.DIALECT_SVG && !mxClient.NO_FO &&
+		this.graph.view.getCanvas().ownerSVGElement != null)
 	{
 		node = this.graph.view.getCanvas().ownerSVGElement.cloneNode(true);
 	}
@@ -1814,7 +1895,6 @@ Sidebar.prototype.createThumb = function(cells, width, height, parent, title, sh
 	
 	node.style.position = 'relative';
 	node.style.overflow = 'hidden';
-	node.style.cursor = 'move';
 	node.style.left = this.thumbBorder + 'px';
 	node.style.top = this.thumbBorder + 'px';
 	node.style.width = width + 'px';
@@ -3388,7 +3468,7 @@ Sidebar.prototype.addFoldingHandler = function(title, content, funct)
 						mxClient.NO_FO = Editor.prototype.originalNoForeignObject;
 						funct(content, title);
 						mxClient.NO_FO = fo;
-					}, 0);
+					}, (mxClient.IS_FF) ? 20 : 0);
 				}
 				else
 				{

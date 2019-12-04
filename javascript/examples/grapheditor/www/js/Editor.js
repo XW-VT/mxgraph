@@ -441,7 +441,7 @@ Editor.prototype.readGraphState = function(node)
 		this.graph.pageScale = mxGraph.prototype.pageScale;
 	}
 
-	if (!this.graph.isLightboxView())
+	if (!this.graph.isLightboxView() && !this.graph.isViewer())
 	{
 		var pv = node.getAttribute('page');
 	
@@ -745,7 +745,7 @@ OpenFile.prototype.cancel = function(cancel)
 /**
  * Basic dialogs that are available in the viewer (print dialog).
  */
-function Dialog(editorUi, elt, w, h, modal, closable, onClose, noScroll, transparent, onResize)
+function Dialog(editorUi, elt, w, h, modal, closable, onClose, noScroll, transparent, onResize, ignoreBgClick)
 {
 	var dx = 0;
 	
@@ -850,10 +850,13 @@ function Dialog(editorUi, elt, w, h, modal, closable, onClose, noScroll, transpa
 		document.body.appendChild(img);
 		this.dialogImg = img;
 		
-		mxEvent.addGestureListeners(this.bg, null, null, mxUtils.bind(this, function(evt)
+		if (!ignoreBgClick)
 		{
-			editorUi.hideDialog(true);
-		}));
+			mxEvent.addGestureListeners(this.bg, null, null, mxUtils.bind(this, function(evt)
+			{
+				editorUi.hideDialog(true);
+			}));
+		}
 	}
 	
 	this.resizeListener = mxUtils.bind(this, function()
@@ -984,6 +987,116 @@ Dialog.prototype.close = function(cancel, isEsc)
 	
 	mxEvent.removeListener(window, 'resize', this.resizeListener);
 	this.container.parentNode.removeChild(this.container);
+};
+
+/**
+ * 
+ */
+var ErrorDialog = function(editorUi, title, message, buttonText, fn, retry, buttonText2, fn2, hide, buttonText3, fn3)
+{
+	hide = (hide != null) ? hide : true;
+	
+	var div = document.createElement('div');
+	div.style.textAlign = 'center';
+
+	if (title != null)
+	{
+		var hd = document.createElement('div');
+		hd.style.padding = '0px';
+		hd.style.margin = '0px';
+		hd.style.fontSize = '18px';
+		hd.style.paddingBottom = '16px';
+		hd.style.marginBottom = '10px';
+		hd.style.borderBottom = '1px solid #c0c0c0';
+		hd.style.color = 'gray';
+		hd.style.whiteSpace = 'nowrap';
+		hd.style.textOverflow = 'ellipsis';
+		hd.style.overflow = 'hidden';
+		mxUtils.write(hd, title);
+		hd.setAttribute('title', title);
+		div.appendChild(hd);
+	}
+
+	var p2 = document.createElement('div');
+	p2.style.lineHeight = '1.2em';
+	p2.style.padding = '6px';
+	p2.innerHTML = message;
+	div.appendChild(p2);
+	
+	var btns = document.createElement('div');
+	btns.style.marginTop = '12px';
+	btns.style.textAlign = 'center';
+	
+	if (retry != null)
+	{
+		var retryBtn = mxUtils.button(mxResources.get('tryAgain'), function()
+		{
+			editorUi.hideDialog();
+			retry();
+		});
+		retryBtn.className = 'geBtn';
+		btns.appendChild(retryBtn);
+		
+		btns.style.textAlign = 'center';
+	}
+	
+	if (buttonText3 != null)
+	{
+		var btn3 = mxUtils.button(buttonText3, function()
+		{
+			if (fn3 != null)
+			{
+				fn3();
+			}
+		});
+		
+		btn3.className = 'geBtn';
+		btns.appendChild(btn3);
+	}
+	
+	var btn = mxUtils.button(buttonText, function()
+	{
+		if (hide)
+		{
+			editorUi.hideDialog();
+		}
+		
+		if (fn != null)
+		{
+			fn();
+		}
+	});
+	
+	btn.className = 'geBtn';
+	btns.appendChild(btn);
+
+	if (buttonText2 != null)
+	{
+		var mainBtn = mxUtils.button(buttonText2, function()
+		{
+			if (hide)
+			{
+				editorUi.hideDialog();
+			}
+			
+			if (fn2 != null)
+			{
+				fn2();
+			}
+		});
+		
+		mainBtn.className = 'geBtn gePrimaryBtn';
+		btns.appendChild(mainBtn);
+	}
+
+	this.init = function()
+	{
+		btn.focus();
+	};
+	
+	div.appendChild(btns);
+
+	this.container = div;
 };
 
 /**
@@ -1774,7 +1887,8 @@ PageSetupDialog.getFormats = function()
 {
 	return [{key: 'letter', title: 'US-Letter (8,5" x 11")', format: mxConstants.PAGE_FORMAT_LETTER_PORTRAIT},
 	        {key: 'legal', title: 'US-Legal (8,5" x 14")', format: new mxRectangle(0, 0, 850, 1400)},
-	        {key: 'tabloid', title: 'US-Tabloid (279 mm x 432 mm)', format: new mxRectangle(0, 0, 1100, 1700)},
+	        {key: 'tabloid', title: 'US-Tabloid (11" x 17")', format: new mxRectangle(0, 0, 1100, 1700)},
+	        {key: 'executive', title: 'US-Executive (7" x 10")', format: new mxRectangle(0, 0, 700, 1000)},
 	        {key: 'a0', title: 'A0 (841 mm x 1189 mm)', format: new mxRectangle(0, 0, 3300, 4681)},
 	        {key: 'a1', title: 'A1 (594 mm x 841 mm)', format: new mxRectangle(0, 0, 2339, 3300)},
 	        {key: 'a2', title: 'A2 (420 mm x 594 mm)', format: new mxRectangle(0, 0, 1654, 2336)},
@@ -1783,6 +1897,11 @@ PageSetupDialog.getFormats = function()
 	        {key: 'a5', title: 'A5 (148 mm x 210 mm)', format: new mxRectangle(0, 0, 583, 827)},
 	        {key: 'a6', title: 'A6 (105 mm x 148 mm)', format: new mxRectangle(0, 0, 413, 583)},
 	        {key: 'a7', title: 'A7 (74 mm x 105 mm)', format: new mxRectangle(0, 0, 291, 413)},
+	        {key: 'b4', title: 'B4 (250 mm x 353 mm)', format: new mxRectangle(0, 0, 980, 1390)},
+	        {key: 'b5', title: 'B5 (176 mm x 250 mm)', format: new mxRectangle(0, 0, 690, 980)},
+	        {key: '16-9', title: '16:9 (1600 x 900)', format: new mxRectangle(0, 0, 1600, 900)},
+	        {key: '16-10', title: '16:10 (1920 x 1200)', format: new mxRectangle(0, 0, 1920, 1200)},
+	        {key: '4-3', title: '4:3 (1600 x 1200)', format: new mxRectangle(0, 0, 1600, 1200)},
 	        {key: 'custom', title: mxResources.get('custom'), format: null}];
 };
 

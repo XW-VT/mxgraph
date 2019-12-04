@@ -1,4 +1,50 @@
-11-MAR-2018: 4.0.0
+08-NOV-2019: 4.0.6
+
+- New vagrant build system
+- Fixes ignored direction for horizontal/vertical flip in mxGraph.getConnectionPoint
+- Consumes iOS touch events by default in mxMouseEvent.consume
+- Fixes handling of empty strings in mxCell.getAttribute
+- Restores clipping in mxPrintPreview
+
+17-OCT-2019: 4.0.5
+
+- Fixes border handling in mxGraph.fit, center and sizeDidChange
+- Makes mxXmlUtils.getDocumentBuilder thread-safe [382]
+- Fixes ignored alignment in mxGraph.cellSizeUpdated
+- Adds optional argument in redraw for handlers
+- Disables resize live preview for groups
+- Adds mxGraphHandler.maxLivePreview
+- Adds mxGuide.isStateIgnored hook
+
+20-JUL-2019: 4.0.4
+
+- Moved PHP code to own repo
+- Adds DPI support in advanced dialog
+
+26-JUL-2019: 4.0.3
+
+- Reverts forcing quotes around font names in CSS and SVG
+- Ignores hidden cells in mxGraph.selectAll
+- Adds mxClient.IS_CHROMEOS
+
+15-JUL-2019: 4.0.2
+
+- Adds mxCellEditor.setAlign for block alignment changes
+- Adds validation for label background and border colors
+- Adds mxGraphHandler.removeEmptyParents
+
+02-JUL-2019: 4.0.1
+
+- Forces quotes around font names in CSS and SVG
+- No longer prevents default for pen/touch events in mxMouseEvent
+- Adds validation for color codes
+- Fixes handling of Infinity in mxObjectCodec
+- Add target for Chrome in mxEvent.addMouseWheelListener
+- Removes scroll handler in mxOutline.destroy
+- Adds mxStackLayout.allowGaps and gridSize
+- Fixes possible NPE in mxGraph.sizeDidChange
+
+11-MAR-2019: 4.0.0
 
 - mxClient.IS_SVG is true for all non-VML browsers
 - Adds mxCellState.invalidStyle

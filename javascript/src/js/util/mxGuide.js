@@ -117,6 +117,16 @@ mxGuide.prototype.createGuideShape = function(horizontal)
 };
 
 /**
+ * Function: isStateIgnored
+ * 
+ * Returns true if the given state should be ignored.
+ */
+mxGuide.prototype.isStateIgnored = function(state)
+{
+	return false;
+};
+
+/**
  * Function: move
  * 
  * Moves the <bounds> by the given <mxPoint> and returnt the snapped point.
@@ -250,7 +260,7 @@ mxGuide.prototype.move = function(bounds, delta, gridEnabled, clone)
 		{
 			var state =  this.states[i];
 			
-			if (state != null)
+			if (state != null && !this.isStateIgnored(state))
 			{
 				// Align x
 				if (this.horizontal)
@@ -297,6 +307,9 @@ mxGuide.prototype.move = function(bounds, delta, gridEnabled, clone)
 		}
 		else if (this.guideX != null)
 		{
+			var minY = null;
+        	var maxY = null;
+        	
 			if (stateX != null && bounds != null)
 			{
 				minY = Math.min(bounds.y + dy - this.graph.panDy, stateX.y);
@@ -323,6 +336,9 @@ mxGuide.prototype.move = function(bounds, delta, gridEnabled, clone)
 		}
 		else if (this.guideY != null)
 		{
+			var minX = null;
+        	var maxX = null;
+        	
 			if (stateY != null && bounds != null)
 			{
 				minX = Math.min(bounds.x + dx - this.graph.panDx, stateY.x);

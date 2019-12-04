@@ -3069,8 +3069,8 @@ mxGraph.prototype.sizeDidChange = function()
 	{
 		var border = this.getBorder();
 		
-		var width = Math.max(0, bounds.x + bounds.width + 2 * border * this.view.scale);
-		var height = Math.max(0, bounds.y + bounds.height + 2 * border * this.view.scale);
+		var width = Math.max(0, bounds.x + bounds.width + border);
+		var height = Math.max(0, bounds.y + bounds.height + border);
 		
 		if (this.minimumContainerSize != null)
 		{
@@ -3107,10 +3107,13 @@ mxGraph.prototype.sizeDidChange = function()
 		{
 			var root = this.view.getDrawPane().ownerSVGElement;
 			
-			root.style.minWidth = Math.max(1, width) + 'px';
-			root.style.minHeight = Math.max(1, height) + 'px';
-			root.style.width = '100%';
-			root.style.height = '100%';
+			if (root != null)
+			{
+				root.style.minWidth = Math.max(1, width) + 'px';
+				root.style.minHeight = Math.max(1, height) + 'px';
+				root.style.width = '100%';
+				root.style.height = '100%';
+			}
 		}
 		else
 		{
@@ -4373,7 +4376,7 @@ mxGraph.prototype.cloneCells = function(cells, allowInvalidEdges, mapping, keepP
 										src = this.model.getParent(src);
 									}
 									
-									if (src == null)
+									if (src == null && pts[0] != null)
 									{
 										g.setTerminalPoint(
 											new mxPoint(pts[0].x / scale - trans.x,
@@ -4387,10 +4390,11 @@ mxGraph.prototype.cloneCells = function(cells, allowInvalidEdges, mapping, keepP
 									{
 										trg = this.model.getParent(trg);
 									}
+
+									var n = pts.length - 1;
 									
-									if (trg == null)
+									if (trg == null && pts[n] != null)
 									{
-										var n = pts.length - 1;
 										g.setTerminalPoint(
 											new mxPoint(pts[n].x / scale - trans.x,
 												pts[n].y / scale - trans.y), false);
@@ -5443,6 +5447,29 @@ mxGraph.prototype.cellSizeUpdated = function(cell, ignoreChildren)
 				}
 				else
 				{
+					var state = this.view.getState(cell) || this.view.createState(cell);
+					var align = (state.style[mxConstants.STYLE_ALIGN] || mxConstants.ALIGN_CENTER);
+					
+					if (align == mxConstants.ALIGN_RIGHT)
+					{
+						geo.x += geo.width - size.width;
+					}
+					else if (align == mxConstants.ALIGN_CENTER)
+					{
+						geo.x += Math.round((geo.width - size.width) / 2);
+					}
+
+					var valign = this.getVerticalAlign(state);
+					
+					if (valign == mxConstants.ALIGN_BOTTOM)
+					{
+						geo.y += geo.height - size.height;
+					}
+					else if (valign == mxConstants.ALIGN_MIDDLE)
+					{
+						geo.y += Math.round((geo.height - size.height) / 2);
+					}
+
 					geo.width = size.width;
 					geo.height = size.height;
 				}
@@ -6750,8 +6777,9 @@ mxGraph.prototype.setConnectionConstraint = function(edge, terminal, source, con
  * constraint - <mxConnectionConstraint> that represents the connection point
  * constraint as returned by <getConnectionConstraint>.
  */
-mxGraph.prototype.getConnectionPoint = function(vertex, constraint)
+mxGraph.prototype.getConnectionPoint = function(vertex, constraint, round)
 {
+	round = (round != null) ? round : true;
 	var point = null;
 	
 	if (vertex != null && constraint.point != null)
@@ -6835,6 +6863,14 @@ mxGraph.prototype.getConnectionPoint = function(vertex, constraint)
 					flipV = (mxUtils.getValue(vertex.style, 'stencilFlipV', 0) == 1) || flipV;
 				}
 				
+				if (direction == mxConstants.DIRECTION_NORTH ||
+					direction == mxConstants.DIRECTION_SOUTH)
+				{
+					var temp = flipH;
+					flipH = flipV
+					flipV = temp;
+				}
+				
 				if (flipH)
 				{
 					point.x = 2 * bounds.getCenterX() - point.x;
@@ -6858,7 +6894,7 @@ mxGraph.prototype.getConnectionPoint = function(vertex, constraint)
 		}
 	}
 	
-	if (point != null)
+	if (round && point != null)
 	{
 		point.x = Math.round(point.x);
 		point.y = Math.round(point.y);
@@ -7761,8 +7797,9 @@ mxGraph.prototype.center = function(horizontal, vertical, cx, cy)
 	cy = (cy != null) ? cy : 0.5;
 	
 	var hasScrollbars = mxUtils.hasScrollbars(this.container);
-	var cw = this.container.clientWidth;
-	var ch = this.container.clientHeight;
+	var padding = 2 * this.getBorder();
+	var cw = this.container.clientWidth - padding;
+	var ch = this.container.clientHeight - padding;
 	var bounds = this.getGraphBounds();
 
 	var t = this.view.translate;
@@ -12041,10 +12078,10 @@ mxGraph.prototype.selectAll = function(parent, descendants)
 {
 	parent = parent || this.getDefaultParent();
 	
-	var cells = (descendants) ? this.model.filterDescendants(function(cell)
+	var cells = (descendants) ? this.model.filterDescendants(mxUtils.bind(this, function(cell)
 	{
-		return cell != parent;
-	}, parent) : this.model.getChildren(parent);
+		return cell != parent && this.view.getState(cell) != null;
+	}), parent) : this.model.getChildren(parent);
 	
 	if (cells != null)
 	{
@@ -12100,7 +12137,11 @@ mxGraph.prototype.selectCells = function(vertices, edges, parent)
 	});
 	
 	var cells = this.model.filterDescendants(filter, parent);
-	this.setSelectionCells(cells);
+	
+	if (cells != null)
+	{
+		this.setSelectionCells(cells);
+	}
 };
 
 /**
